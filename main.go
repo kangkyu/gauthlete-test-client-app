@@ -20,13 +20,50 @@ var (
 
 var sessionManager *scs.SessionManager
 
+var tokenStore = NewTokenStore()
+
+// TokenStore manages token storage securely in memory
+type TokenStore struct {
+	tokens map[string]*oauth2.Token
+	mutex  sync.RWMutex
+}
+
+// NewTokenStore creates a new TokenStore
+func NewTokenStore() *TokenStore {
+	return &TokenStore{
+		tokens: make(map[string]*oauth2.Token),
+	}
+}
+
+// StoreToken stores a token and returns a unique ID
+func (ts *TokenStore) StoreToken(token *oauth2.Token) (string, error) {
+	id, err := generateRandomID()
+	if err != nil {
+		return "", err
+	}
+
+	ts.mutex.Lock()
+	defer ts.mutex.Unlock()
+	ts.tokens[id] = token
+	return id, nil
+}
+
+// GetToken retrieves a token by its ID
+func (ts *TokenStore) GetToken(id string) (*oauth2.Token, bool) {
+	ts.mutex.RLock()
+	defer ts.mutex.RUnlock()
+	token, exists := ts.tokens[id]
+	return token, exists
+}
+
+
 func main() {
-    // Initialize a new session manager and configure it to use in-memory storage
-    sessionManager = scs.New()
-    // sessionManager.Store = scs.NewMemoryStore()
-    sessionManager.Lifetime = 24 * time.Hour
-    sessionManager.IdleTimeout = 20 * time.Minute
-    sessionManager.Cookie.Secure = true
+	// Initialize a new session manager and configure it to use in-memory storage
+	sessionManager = scs.New()
+	// sessionManager.Store = scs.NewMemoryStore()
+	sessionManager.Lifetime = 24 * time.Hour
+	sessionManager.IdleTimeout = 20 * time.Minute
+	sessionManager.Cookie.Secure = true
 
 	oauth2Config = &oauth2.Config{
 		ClientID:     os.Getenv("CLIENT_ID"),
@@ -92,17 +129,45 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Store the token in the session or encrypt and store in a cookie
-	sessionManager.Put(r.Context(), "message", token.AccessToken)
-	// For this example, we'll just display it
-	fmt.Fprintf(w, `<p>Access Token: %s</p><br><a href="/profile">Fetch Profile</a>`, token.AccessToken)
+	tokenID, err := tokenStore.StoreToken(token)
+	if err != nil {
+		http.Error(w, "Failed to secure token", http.StatusInternalServerError)
+		return
+	}
+
+
+	// Store the token securely
+	tokenID, err := tokenStore.StoreToken(token)
+	if err != nil {
+		http.Error(w, "Failed to secure token", http.StatusInternalServerError)
+		return
+	}
+
+	// Store only the token ID in the session
+	err = sessionManager.Put(r.Context(), "token_id", tokenID)
+	if err != nil {
+		http.Error(w, "Failed to store session data", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/profile", http.StatusFound)
 }
 
 func profileHandler(w http.ResponseWriter, r *http.Request) {
-	// In a real app, get the token from the session or cookie
-	msg := sessionManager.GetString(r.Context(), "message")
 
-	token := &oauth2.Token{AccessToken: msg}
+	// Retrieve the token ID from the session
+	tokenID := sessionManager.GetString(r.Context(), "token_id")
+	if tokenID == "" {
+		http.Error(w, "No valid session", http.StatusUnauthorized)
+		return
+	}
+
+	// Get the actual token using the ID
+	token, exists := tokenStore.GetToken(tokenID)
+	if !exists {
+		http.Error(w, "Token not found", http.StatusUnauthorized)
+		return
+	}
 
 	client := oauth2Config.Client(context.Background(), token)
 	resp, err := client.Get("http://localhost:8080/userinfo") // Your auth server's userinfo endpoint
