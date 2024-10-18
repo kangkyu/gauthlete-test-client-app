@@ -8,7 +8,7 @@ CLIENT_SECRET='...' \
 go run .
 ```
 
-For this app, make client id and secret! There's no endpoint fot that yet (on the authorization server side), but for now we can still make request to these endpoint to get client id and secret:
+For this app, make client id and secret! There's no endpoint fot that yet (on the [gauthlete-test-application](https://github.com/kangkyu/gauthlete-test-application) side), but for now we can still make request to these endpoint to get client id and secret:
 
 https://docs.authlete.com/en/shared/latest#get-/api/client/get/list
 

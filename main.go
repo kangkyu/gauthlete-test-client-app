@@ -7,8 +7,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/oauth2"
+	"github.com/alexedwards/scs/v2"
 )
 
 var (
@@ -16,7 +18,16 @@ var (
 	state        = "random-string" // In a real app, generate this dynamically
 )
 
+var sessionManager *scs.SessionManager
+
 func main() {
+    // Initialize a new session manager and configure it to use in-memory storage
+    sessionManager = scs.New()
+    // sessionManager.Store = scs.NewMemoryStore()
+    sessionManager.Lifetime = 24 * time.Hour
+    sessionManager.IdleTimeout = 20 * time.Minute
+    sessionManager.Cookie.Secure = true
+
 	oauth2Config = &oauth2.Config{
 		ClientID:     os.Getenv("CLIENT_ID"),
 		ClientSecret: os.Getenv("CLIENT_SECRET"),
@@ -28,13 +39,14 @@ func main() {
 		},
 	}
 
-	http.HandleFunc("/", homeHandler)
-	http.HandleFunc("/login", loginHandler)
-	http.HandleFunc("/callback", callbackHandler)
-	http.HandleFunc("/profile", profileHandler)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", homeHandler)
+	mux.HandleFunc("/login", loginHandler)
+	mux.HandleFunc("/callback", callbackHandler)
+	mux.HandleFunc("/profile", profileHandler)
 
 	log.Println("Client is running at http://localhost:8081")
-	log.Fatal(http.ListenAndServe(":8081", nil))
+	log.Fatal(http.ListenAndServe(":8081", sessionManager.LoadAndSave(mux)))
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -81,13 +93,16 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store the token in the session or encrypt and store in a cookie
+	sessionManager.Put(r.Context(), "message", token.AccessToken)
 	// For this example, we'll just display it
-	fmt.Fprintf(w, `Access Token: %s<br><a href="/profile">Fetch Profile</a>`, token.AccessToken)
+	fmt.Fprintf(w, `<p>Access Token: %s</p><br><a href="/profile">Fetch Profile</a>`, token.AccessToken)
 }
 
 func profileHandler(w http.ResponseWriter, r *http.Request) {
 	// In a real app, get the token from the session or cookie
-	token := &oauth2.Token{AccessToken: "access-token-from-callback"}
+	msg := sessionManager.GetString(r.Context(), "message")
+
+	token := &oauth2.Token{AccessToken: msg}
 
 	client := oauth2Config.Client(context.Background(), token)
 	resp, err := client.Get("http://localhost:8080/userinfo") // Your auth server's userinfo endpoint
@@ -97,7 +112,7 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	var profile map[string]interface{}
+	var profile map[string]string
 	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
 		http.Error(w, "Failed to parse user info: "+err.Error(), http.StatusInternalServerError)
 		return
