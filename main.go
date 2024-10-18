@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"time"
+	"sync"
 
 	"golang.org/x/oauth2"
 	"github.com/alexedwards/scs/v2"
@@ -37,10 +40,7 @@ func NewTokenStore() *TokenStore {
 
 // StoreToken stores a token and returns a unique ID
 func (ts *TokenStore) StoreToken(token *oauth2.Token) (string, error) {
-	id, err := generateRandomID()
-	if err != nil {
-		return "", err
-	}
+	id := generateRandomID(32)
 
 	ts.mutex.Lock()
 	defer ts.mutex.Unlock()
@@ -129,13 +129,6 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenID, err := tokenStore.StoreToken(token)
-	if err != nil {
-		http.Error(w, "Failed to secure token", http.StatusInternalServerError)
-		return
-	}
-
-
 	// Store the token securely
 	tokenID, err := tokenStore.StoreToken(token)
 	if err != nil {
@@ -144,11 +137,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store only the token ID in the session
-	err = sessionManager.Put(r.Context(), "token_id", tokenID)
-	if err != nil {
-		http.Error(w, "Failed to store session data", http.StatusInternalServerError)
-		return
-	}
+	sessionManager.Put(r.Context(), "token_id", tokenID)
 
 	http.Redirect(w, r, "/profile", http.StatusFound)
 }
@@ -184,4 +173,14 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprintf(w, "User Profile: %+v", profile)
+}
+
+func generateRandomID(length int) string {
+    bytes := make([]byte, length)
+    _, err := rand.Read(bytes)
+    if err != nil {
+        // This is generally safe as rand.Read only fails in exceptional circumstances.
+        log.Fatalf("Error generating random bytes: %v", err)
+    }
+    return base64.URLEncoding.EncodeToString(bytes)[:length]
 }
