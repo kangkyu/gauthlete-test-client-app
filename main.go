@@ -66,8 +66,8 @@ func main() {
 	sessionManager.Cookie.Secure = true
 
 	oauth2Config = &oauth2.Config{
-		ClientID:     os.Getenv("CLIENT_ID"),
-		ClientSecret: os.Getenv("CLIENT_SECRET"),
+		ClientID:     os.Getenv("AUTHLETE_CLIENT_ID"),
+		ClientSecret: os.Getenv("AUTHLETE_CLIENT_SECRET"),
 		RedirectURL:  "http://localhost:8081/callback",
 		Scopes:       []string{"openid", "profile"},
 		Endpoint: oauth2.Endpoint{

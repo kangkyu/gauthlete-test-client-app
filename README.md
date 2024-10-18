@@ -3,8 +3,8 @@
 test app for [Gauthlete](https://github.com/kangkyu/gauthlete) library development
 
 ```
-CLIENT_ID='...' \
-CLIENT_SECRET='...' \
+AUTHLETE_CLIENT_ID='...' \
+AUTHLETE_CLIENT_SECRET='...' \
 go run .
 ```
 
