@@ -9,11 +9,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 	"sync"
+	"time"
 
-	"golang.org/x/oauth2"
 	"github.com/alexedwards/scs/v2"
+	"golang.org/x/oauth2"
 )
 
 var (
@@ -56,11 +56,10 @@ func (ts *TokenStore) GetToken(id string) (*oauth2.Token, bool) {
 	return token, exists
 }
 
-
 func main() {
 	// Initialize a new session manager and configure it to use in-memory storage
 	sessionManager = scs.New()
-	// sessionManager.Store = scs.NewMemoryStore()
+	// sessionManager.Store = scs.NewMemoryStore() // commented as no need because default
 	sessionManager.Lifetime = 24 * time.Hour
 	sessionManager.IdleTimeout = 20 * time.Minute
 	sessionManager.Cookie.Secure = true
@@ -176,11 +175,11 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func generateRandomID(length int) string {
-    bytes := make([]byte, length)
-    _, err := rand.Read(bytes)
-    if err != nil {
-        // This is generally safe as rand.Read only fails in exceptional circumstances.
-        log.Fatalf("Error generating random bytes: %v", err)
-    }
-    return base64.URLEncoding.EncodeToString(bytes)[:length]
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		// This is generally safe as rand.Read only fails in exceptional circumstances.
+		log.Fatalf("Error generating random bytes: %v", err)
+	}
+	return base64.URLEncoding.EncodeToString(bytes)[:length]
 }

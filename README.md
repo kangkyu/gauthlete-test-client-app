@@ -12,4 +12,5 @@ For this app, make client id and secret! There's no endpoint fot that yet (on th
 
 https://docs.authlete.com/en/shared/latest#get-/api/client/get/list
 
+https://docs.authlete.com/en/shared/latest#post-/api/client/create
 https://docs.authlete.com/en/shared/latest#post-/api/client/update/-clientId-
