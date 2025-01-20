@@ -3,12 +3,13 @@
 test app for [Gauthlete](https://github.com/kangkyu/gauthlete) library development
 
 ```
-AUTHLETE_CLIENT_ID='...' \
-AUTHLETE_CLIENT_SECRET='...' \
+AUTH_SERVER_CLIENT_ID='...' \
+AUTH_SERVER_CLIENT_SECRET='...' \
 go run .
 ```
 
-For this app, make client id and secret! There's no endpoint fot that yet (on the [gauthlete-test-application](https://github.com/kangkyu/gauthlete-test-application) side), but for now we can still make request to these endpoint to get client id and secret:
+For this app, make client id and secret! There's no endpoint for that yet (on the [gauthlete-test-application](https://github.com/kangkyu/gauthlete-test-application) side),
+but for now we can still make requests to these endpoints to get client id and secret:
 
 https://docs.authlete.com/en/shared/latest#get-/api/client/get/list
 
