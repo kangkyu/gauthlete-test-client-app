@@ -74,11 +74,6 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8081", mux))
 }
 
-func homeHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, `<h1>OAuth 2.0 Client</h1><a href="/login">Log In</a>`)
-}
-
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	state := generateRandomString(32)
 	codeVerifier := oauth2.GenerateVerifier()
@@ -162,7 +157,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 	})
 
-	http.Redirect(w, r, "/profile", http.StatusFound)
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 func profileHandler(w http.ResponseWriter, r *http.Request) {
@@ -216,10 +211,67 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("token_id")
+	if err != nil {
+		// No token, show login link
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, `<h1>OAuth 2.0 Client</h1><a href="/login">Log In</a>`)
+		return
+	}
+
+	token, exists := tokenStore.GetToken(cookie.Value)
+	if !exists {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, `<h1>OAuth 2.0 Client</h1><a href="/login">Log In</a>`)
+		return
+	}
+
+	// Create request with token
+	req, err := http.NewRequest("GET", "http://localhost:8082/", nil)
+	if err != nil {
+		http.Error(w, "Failed to create request: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Add token to Authorization header
+	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
+
+	// Make the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, "Failed to get backend data: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	var backendResponse map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&backendResponse); err != nil {
+		http.Error(w, "Failed to parse backend response: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintf(w, `
+        <h1>Backend Response</h1>
+        <pre>%s</pre>
+        <p><a href="/logout">Logout</a></p>
+    `, prettyPrintJSON(backendResponse))
+}
+
 func generateRandomString(length int) string {
 	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {
 		panic(err)
 	}
 	return base64.URLEncoding.EncodeToString(bytes)[:length]
+}
+
+func prettyPrintJSON(data interface{}) string {
+	prettyJSON, err := json.MarshalIndent(data, "", "    ")
+	if err != nil {
+		return fmt.Sprintf("%v", data)
+	}
+	return string(prettyJSON)
 }
